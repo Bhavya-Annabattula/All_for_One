@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      width: 340px;
+      padding: 16px;
+      font-family: system-ui, sans-serif;
+      background: #1e1e2e;
+      color: #eee;
+    }
+    h2 {
+      margin: 0 0 4px 0;
+      font-size: 17px;
+    }
+    .subtitle {
+      font-size: 11px;
+      color: #999;
+      margin-bottom: 16px;
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px;
+      border-radius: 8px;
+      background: #2a2a3d;
+      margin-bottom: 16px;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #888;
+      flex-shrink: 0;
+    }
+    .status-dot.safe { background: #22c55e; }
+    .status-dot.warning { background: #eab308; }
+    .status-text {
+      font-size: 12px;
+    }
+    .status-text .site-url {
+      display: block;
+      font-size: 10px;
+      color: #999;
+      margin-top: 2px;
+      word-break: break-all;
+    }
+
+    /* Circular icon row */
+    .icon-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .icon-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #ddd;
+    }
+    .icon-circle {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 2px solid #3a3a4d;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      text-align: center;
+      transition: all 0.15s ease;
+      background: #2a2a3d;
+    }
+    .icon-btn:hover .icon-circle {
+      border-color: #4f46e5;
+    }
+    .icon-btn.active .icon-circle {
+      background: #4f46e5;
+      border-color: #4f46e5;
+      color: white;
+    }
+    .icon-label {
+      font-size: 10px;
+      text-align: center;
+    }
+
+    /* Security full-width bar */
+    .security-btn {
+      width: 100%;
+      padding: 10px;
+      background: #2a2a3d;
+      border: 2px solid #3a3a4d;
+      border-radius: 20px;
+      color: #ddd;
+      font-size: 12px;
+      cursor: pointer;
+      margin-bottom: 12px;
+    }
+    .security-btn:hover {
+      border-color: #4f46e5;
+    }
+    .security-btn.active {
+      background: #4f46e5;
+      border-color: #4f46e5;
+      color: white;
+    }
+
+    .panel {
+      display: none;
+    }
+    .panel.active {
+      display: block;
+    }
+
+    #xrayResult, #securityResult {
+      padding: 10px;
+      background: #2a2a3d;
+      border-radius: 6px;
+      font-size: 12px;
+      min-height: 140px;
+      max-height: 240px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin-bottom: 8px;
+    }
+    button.action-btn {
+      width: 100%;
+      padding: 9px;
+      background: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    button.action-btn:hover {
+      background: #4338ca;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 38px;
+      height: 20px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #444;
+      transition: .2s;
+      border-radius: 20px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .2s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #4f46e5;
+    }
+    input:checked + .slider:before {
+      transform: translateX(18px);
+    }
+    .avatar-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+    }
+    .avatar-note {
+      font-size: 11px;
+      color: #999;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h2>All for One</h2>
+  <div class="subtitle">Security check - Tech detector - Page-aware AI chat</div>
+
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <div class="status-text">
+      <span id="statusLabel">Checking site...</span>
+      <span class="site-url" id="siteUrl"></span>
+    </div>
+  </div>
+
+  <div class="icon-row">
+    <button class="icon-btn" id="chatbotBtn">
+      <div class="icon-circle">AI CHAT</div>
+      <div class="icon-label">AI Chatbot</div>
+    </button>
+    <button class="icon-btn" id="assistanceBtn" data-panel="avatar">
+      <div class="icon-circle">BUDDY</div>
+      <div class="icon-label">AI Assistance</div>
+    </button>
+    <button class="icon-btn active" id="xrayIconBtn" data-panel="xray">
+      <div class="icon-circle">X-RAY</div>
+      <div class="icon-label">Tech Xray</div>
+    </button>
+  </div>
+
+  <button class="security-btn" id="securityIconBtn" data-panel="security">Security</button>
+
+  <div class="panel active" id="xray">
+    <div id="xrayResult">Click Tech Xray icon again to scan this site.</div>
+    <button class="action-btn" id="xrayBtn">Run Tech X-ray</button>
+  </div>
+
+  <div class="panel" id="security">
+    <div id="securityResult">Click check to scan this site for risks.</div>
+    <button class="action-btn" id="securityBtn">Check Site Safety</button>
+  </div>
+
+  <div class="panel" id="avatar">
+    <div class="avatar-row">
+      <span>Show floating AI buddy on page</span>
+      <label class="switch">
+        <input type="checkbox" id="avatarToggle">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="avatar-note">
+      The buddy follows your cursor and reacts when clicked. Click it anytime to open the chatbot.
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
