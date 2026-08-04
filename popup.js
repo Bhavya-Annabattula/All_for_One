@@ -73,7 +73,7 @@ document.getElementById("xrayBtn").addEventListener("click", async () => {
 
 // --- Security ---
 // --- Security ---
-const BACKEND_URL = "http://127.0.0.1:5000";// same URL as your RAG backend
+const BACKEND_URL = "https://all-for-one-r4jy.onrender.com";// same URL as your RAG backend
 
 document.getElementById("securityBtn").addEventListener("click", async () => {
   const resultDiv = document.getElementById("securityResult");
