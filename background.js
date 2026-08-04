@@ -1,4 +1,4 @@
-const BACKEND_URL = "https://your-backend-url.hf.space"; // update once deployed
+const BACKEND_URL = "https://all-for-one-r4jy.onrender.com"; // update once deployed
 
 async function getActiveTabId() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
