@@ -18,7 +18,7 @@ if not GROQ_API_KEY:
 
 client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
-MODEL = "llama3-70b-8192"
+MODEL = "llama-3.3-70b-versatile"
 
 MAX_TEXT_CHARS = 12000  # keep prompts within a safe token budget
 
