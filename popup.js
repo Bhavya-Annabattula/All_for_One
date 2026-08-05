@@ -59,7 +59,7 @@ document.getElementById("xrayBtn").addEventListener("click", async () => {
 
   btn.disabled = true;
   btn.textContent = "Scanning...";
-  resultDiv.innerHTML = "Scanning this page...";
+  resultDiv.innerHTML = `<div class="scan-loading"><span class="dot-pulse"></span> Scanning page for technologies...</div>`;
 
   try {
     const tab = await getActiveTab();
@@ -89,42 +89,57 @@ function renderXrayResult(data) {
   const catNames = Object.keys(categories);
 
   if (catNames.length === 0) {
-    resultDiv.innerHTML = `<div style="color:#999; font-size:12px;">No recognizable technologies detected on this page.</div>`;
+    resultDiv.innerHTML = `
+      <div class="scan-empty">
+        <div class="scan-empty-icon">◌</div>
+        <div>No recognizable technologies detected on this page.</div>
+      </div>`;
     return;
   }
 
-  const catColors = {
-    "Frameworks": "#818cf8",
-    "CMS": "#f472b6",
-    "Analytics": "#eab308",
-    "CDN": "#38bdf8",
-    "Hosting": "#38bdf8",
-    "Fonts & UI": "#a78bfa",
-    "Payments": "#22c55e"
+  const catMeta = {
+    "Frameworks": { color: "#818cf8", icon: "⚛" },
+    "CMS": { color: "#f472b6", icon: "▤" },
+    "Analytics": { color: "#eab308", icon: "◈" },
+    "CDN": { color: "#38bdf8", icon: "☁" },
+    "Hosting": { color: "#38bdf8", icon: "☁" },
+    "Fonts & UI": { color: "#a78bfa", icon: "Aa" },
+    "Payments": { color: "#22c55e", icon: "$" }
   };
 
-  const html = catNames.map(cat => {
+  const totalCount = catNames.reduce((sum, c) => sum + categories[c].length, 0);
+
+  const summaryHtml = `
+    <div class="xray-summary-bar">
+      <span>Scan complete</span>
+      <span><strong>${totalCount}</strong> technolog${totalCount === 1 ? "y" : "ies"} detected</span>
+    </div>`;
+
+  const categoriesHtml = catNames.map((cat, i) => {
+    const meta = catMeta[cat] || { color: "#999", icon: "•" };
     const items = categories[cat];
-    const color = catColors[cat] || "#999";
-    const itemsHtml = items.map(item => `
-      <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid #2a2a3d;">
-        <span style="font-size:12px;">${escHtml(item.name)}</span>
+
+    const chipsHtml = items.map(item => `
+      <div class="xray-chip" style="--chip-color: ${meta.color};">
+        <span class="chip-name">${escHtml(item.name)}</span>
+        <span class="chip-evidence" title="${escHtml(item.evidence || "")}">${escHtml(item.evidence || "")}</span>
       </div>
     `).join("");
 
     return `
-      <div style="margin-bottom:10px;">
-        <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:${color}; margin-bottom:4px; font-weight:600;">
-          ${escHtml(cat)}
+      <div class="xray-category" style="animation-delay: ${i * 60}ms;">
+        <div class="xray-category-header" style="color: ${meta.color};">
+          <span class="cat-dot" style="background:${meta.color};"></span>
+          <span>${escHtml(cat)}</span>
+          <span class="cat-count">${items.length}</span>
         </div>
-        ${itemsHtml}
+        ${chipsHtml}
       </div>
     `;
   }).join("");
 
-  resultDiv.innerHTML = html;
+  resultDiv.innerHTML = summaryHtml + categoriesHtml;
 }
-
 // --- Security ---
 // --- Security ---
 const BACKEND_URL = "https://all-for-one-r4jy.onrender.com";// same URL as your RAG backend
@@ -135,7 +150,7 @@ document.getElementById("securityBtn").addEventListener("click", async () => {
 
   btn.disabled = true;
   btn.textContent = "Scanning...";
-  resultDiv.innerHTML = "Scanning this page...";
+ resultDiv.innerHTML = `<div class="scan-loading"><span class="dot-pulse"></span> Analyzing page content...</div>`;
 
   try {
     const tab = await getActiveTab();
@@ -175,35 +190,48 @@ document.getElementById("securityBtn").addEventListener("click", async () => {
 function renderSecurityResult(d) {
   const resultDiv = document.getElementById("securityResult");
   const verdictColor = d.verdict === "safe" ? "#22c55e" : d.verdict === "warning" ? "#eab308" : "#ef4444";
+  const verdictIcon = d.verdict === "safe" ? "✓" : d.verdict === "warning" ? "!" : "✕";
   const labels = { aiGenerated: "AI-Generated Content", scam: "Scam / Fraud", fakeNews: "Fake / Misinformation", clickbait: "Clickbait" };
 
+  const bannerHtml = `
+    <div class="sec-verdict-banner" style="--verdict-color: ${verdictColor};">
+      <div class="sec-verdict-icon" style="color:${verdictColor};">${verdictIcon}</div>
+      <div class="sec-verdict-text">
+        <strong>${escHtml(d.verdictTitle || "")}</strong>
+        <p>${escHtml(d.verdictSummary || "")}</p>
+      </div>
+    </div>`;
+
   const scoresHtml = Object.entries(d.scores || {}).map(([key, val]) => {
-    const barColor = val < 35 ? "#22c55e" : val < 65 ? "#eab308" : "#ef4444";
+    const [start, end] = val < 35
+      ? ["#16a34a", "#22c55e"]
+      : val < 65
+        ? ["#ca8a04", "#eab308"]
+        : ["#dc2626", "#ef4444"];
     return `
-      <div style="margin-bottom:6px;">
-        <div style="display:flex; justify-content:space-between; font-size:11px; color:#999;">
+      <div class="sec-score-row">
+        <div class="sec-score-label">
           <span>${labels[key] || key}</span><span>${val}%</span>
         </div>
-        <div style="height:5px; background:#1e1e2e; border-radius:99px; overflow:hidden;">
-          <div style="height:100%; width:${val}%; background:${barColor};"></div>
+        <div class="sec-score-track">
+          <div class="sec-score-fill" style="width:${val}%; --fill-start:${start}; --fill-end:${end};"></div>
         </div>
       </div>`;
   }).join("");
 
   const findingsHtml = (d.findings || []).map(f => {
     const dotColor = f.level === "ok" ? "#22c55e" : f.level === "warn" ? "#eab308" : "#ef4444";
-    return `<div style="display:flex; gap:6px; font-size:11px; margin-bottom:4px;">
-      <span style="color:${dotColor};">●</span><span>${escHtml(f.text)}</span>
-    </div>`;
+    return `
+      <div class="sec-finding-row">
+        <span class="sec-finding-dot" style="background:${dotColor}; color:${dotColor};"></span>
+        <span>${escHtml(f.text)}</span>
+      </div>`;
   }).join("");
 
   resultDiv.innerHTML = `
-    <div style="border-left:3px solid ${verdictColor}; padding-left:8px; margin-bottom:10px;">
-      <strong style="color:${verdictColor}; font-size:13px;">${escHtml(d.verdictTitle || "")}</strong>
-      <p style="font-size:11px; color:#bbb; margin:4px 0 0;">${escHtml(d.verdictSummary || "")}</p>
-    </div>
+    ${bannerHtml}
     <div>${scoresHtml}</div>
-    <div style="margin-top:8px; padding-top:8px; border-top:1px solid #3a3a4d;">${findingsHtml}</div>
+    <div class="sec-findings">${findingsHtml}</div>
   `;
 }
 
