@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
     body {
       width: 340px;
       padding: 16px;
@@ -123,7 +124,6 @@
 
     #xrayResult, #securityResult {
       padding: 10px;
-      background: #2a2a3d;
       border-radius: 6px;
       font-size: 12px;
       min-height: 140px;
@@ -195,6 +195,228 @@
       margin-top: 4px;
     }
   </style>
+  <style>
+  /* ---------- Shared scan-result container ---------- */
+  #xrayResult, #securityResult {
+    background: linear-gradient(180deg, #23233a 0%, #1c1c2e 100%);
+    border: 1px solid #33334a;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  #xrayResult::before, #securityResult::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #4f46e5, transparent);
+    opacity: 0.6;
+  }
+
+  .scan-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 24px 10px;
+    color: #666;
+    font-size: 12px;
+    text-align: center;
+  }
+  .scan-empty .scan-empty-icon {
+    font-size: 20px;
+    opacity: 0.5;
+  }
+
+  .scan-loading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #a5b4fc;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .scan-loading .dot-pulse {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #4f46e5;
+    animation: dotPulse 1s infinite ease-in-out;
+  }
+  @keyframes dotPulse {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.1); }
+  }
+
+  /* ---------- Tech X-ray: category groups ---------- */
+  .xray-category {
+    margin-bottom: 14px;
+    animation: slideIn 0.35s ease backwards;
+  }
+  .xray-category:last-child { margin-bottom: 2px; }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-6px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .xray-category-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .xray-category-header .cat-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    box-shadow: 0 0 6px currentColor;
+  }
+  .xray-category-header .cat-count {
+    margin-left: auto;
+    opacity: 0.5;
+    font-weight: 400;
+  }
+
+  .xray-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    margin-bottom: 4px;
+    background: #262640;
+    border: 1px solid #34344f;
+    border-left: 3px solid var(--chip-color, #4f46e5);
+    border-radius: 6px;
+    transition: transform 0.12s ease, border-color 0.12s ease;
+  }
+  .xray-chip:hover {
+    transform: translateX(2px);
+    border-left-color: var(--chip-color, #4f46e5);
+    background: #2a2a48;
+  }
+  .xray-chip .chip-name {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: #eee;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .xray-chip .chip-evidence {
+    font-size: 10px;
+    color: #777;
+    margin-left: auto;
+    text-align: right;
+    max-width: 130px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .xray-summary-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    background: #1a1a2c;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    font-size: 11px;
+    color: #999;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .xray-summary-bar strong {
+    color: #a5b4fc;
+    font-size: 15px;
+  }
+
+  /* ---------- Security: verdict banner ---------- */
+  .sec-verdict-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    background: color-mix(in srgb, var(--verdict-color, #22c55e) 12%, #1e1e2e);
+    border: 1px solid color-mix(in srgb, var(--verdict-color, #22c55e) 35%, transparent);
+  }
+  .sec-verdict-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+    background: color-mix(in srgb, var(--verdict-color, #22c55e) 25%, transparent);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--verdict-color, #22c55e) 40%, transparent);
+  }
+  .sec-verdict-text strong {
+    color: var(--verdict-color, #22c55e);
+    font-size: 13.5px;
+    display: block;
+  }
+  .sec-verdict-text p {
+    font-size: 11px;
+    color: #bbb;
+    margin: 3px 0 0;
+    line-height: 1.4;
+  }
+
+  .sec-score-row {
+    margin-bottom: 8px;
+  }
+  .sec-score-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #999;
+    margin-bottom: 3px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .sec-score-track {
+    height: 6px;
+    background: #16161f;
+    border-radius: 99px;
+    overflow: hidden;
+  }
+  .sec-score-fill {
+    height: 100%;
+    border-radius: 99px;
+    transition: width 0.5s ease;
+    background: linear-gradient(90deg, var(--fill-start), var(--fill-end));
+  }
+
+  .sec-findings {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed #34344f;
+  }
+  .sec-finding-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    font-size: 11.5px;
+    margin-bottom: 6px;
+    color: #ccc;
+    line-height: 1.4;
+  }
+  .sec-finding-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-top: 3px;
+    flex-shrink: 0;
+    box-shadow: 0 0 5px currentColor;
+  }
+  </style>
 </head>
 <body>
   <h2>All for One</h2>
@@ -226,12 +448,12 @@
   <button class="security-btn" id="securityIconBtn" data-panel="security">Security</button>
 
   <div class="panel active" id="xray">
-    <div id="xrayResult">Click Tech Xray icon again to scan this site.</div>
+    <div id="xrayResult"><div class="scan-empty"><div class="scan-empty-icon">◌</div><div>Click "Run Tech X-ray" to scan this site.</div></div></div>
     <button class="action-btn" id="xrayBtn">Run Tech X-ray</button>
   </div>
 
   <div class="panel" id="security">
-    <div id="securityResult">Click check to scan this site for risks.</div>
+    <div id="securityResult"><div class="scan-empty"><div class="scan-empty-icon">◌</div><div>Click "Check Site Safety" to scan this site.</div></div></div>
     <button class="action-btn" id="securityBtn">Check Site Safety</button>
   </div>
 
