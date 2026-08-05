@@ -55,21 +55,75 @@ loadSiteStatus();
 // --- X-ray ---
 document.getElementById("xrayBtn").addEventListener("click", async () => {
   const resultDiv = document.getElementById("xrayResult");
-  resultDiv.textContent = "Scanning...";
+  const btn = document.getElementById("xrayBtn");
+
+  btn.disabled = true;
+  btn.textContent = "Scanning...";
+  resultDiv.innerHTML = "Scanning this page...";
 
   try {
     const tab = await getActiveTab();
-    chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE_CONTENT" }, (response) => {
-      if (chrome.runtime.lastError) {
-        resultDiv.textContent = "Error: " + chrome.runtime.lastError.message;
-        return;
-      }
-      resultDiv.textContent = "X-ray logic not built yet. Page loaded: " + response.title;
+
+    const [injectionResult] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: detectTechStack,
+      world: "MAIN"
     });
+
+    const data = injectionResult && injectionResult.result
+      ? injectionResult.result
+      : { categories: {} };
+
+    renderXrayResult(data);
   } catch (err) {
-    resultDiv.textContent = "Error: " + err.message;
+    resultDiv.innerHTML = `<div style="color:#f87171;">Error: ${escHtml(err.message)}</div>`;
   }
+
+  btn.disabled = false;
+  btn.textContent = "Run Tech X-ray";
 });
+
+function renderXrayResult(data) {
+  const resultDiv = document.getElementById("xrayResult");
+  const categories = data.categories || {};
+  const catNames = Object.keys(categories);
+
+  if (catNames.length === 0) {
+    resultDiv.innerHTML = `<div style="color:#999; font-size:12px;">No recognizable technologies detected on this page.</div>`;
+    return;
+  }
+
+  const catColors = {
+    "Frameworks": "#818cf8",
+    "CMS": "#f472b6",
+    "Analytics": "#eab308",
+    "CDN": "#38bdf8",
+    "Hosting": "#38bdf8",
+    "Fonts & UI": "#a78bfa",
+    "Payments": "#22c55e"
+  };
+
+  const html = catNames.map(cat => {
+    const items = categories[cat];
+    const color = catColors[cat] || "#999";
+    const itemsHtml = items.map(item => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid #2a2a3d;">
+        <span style="font-size:12px;">${escHtml(item.name)}</span>
+      </div>
+    `).join("");
+
+    return `
+      <div style="margin-bottom:10px;">
+        <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:${color}; margin-bottom:4px; font-weight:600;">
+          ${escHtml(cat)}
+        </div>
+        ${itemsHtml}
+      </div>
+    `;
+  }).join("");
+
+  resultDiv.innerHTML = html;
+}
 
 // --- Security ---
 // --- Security ---
