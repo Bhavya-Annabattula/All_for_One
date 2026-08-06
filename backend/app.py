@@ -58,7 +58,6 @@ def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
     current = ""
 
     for sentence in sentences:
-        # guard against single sentences longer than chunk_size
         if len(sentence) > chunk_size:
             if current:
                 chunks.append(current.strip())
@@ -87,20 +86,15 @@ def retrieve_relevant_chunks(chunks, question, top_k=TOP_K):
         return chunks
 
     try:
-        # Character n-grams (not word tokens) so plurals and word-form
-        # variations like "restaurant" vs "restaurants" still match well,
-        # without needing a separate stemming library.
         vectorizer = TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 5))
         chunk_vectors = vectorizer.fit_transform(chunks)
         question_vector = vectorizer.transform([question])
         sims = cosine_similarity(question_vector, chunk_vectors)[0]
 
         ranked_indices = sims.argsort()[::-1][:top_k]
-        # keep original page order among the selected chunks for readability
         ranked_indices = sorted(ranked_indices)
         return [chunks[i] for i in ranked_indices]
     except ValueError:
-        # can happen if the question/chunks produce an empty vocabulary after stop-word removal
         return chunks[:top_k]
 
 
@@ -122,25 +116,23 @@ def security_scan():
     if not text:
         return jsonify({"error": "No page text provided"}), 400
 
-   system_prompt = (
-        "You answer questions for someone browsing a webpage. You are given "
-        "excerpts from that page and a question. Follow this exact procedure:\n\n"
-        "STEP 1: Check if the excerpts below answer the question.\n"
-        "STEP 2: If yes, answer using the excerpts. Do not mention excerpts, pages, "
-        "or sources - just answer naturally, as if you simply know it.\n"
-        "STEP 3: If the excerpts do NOT answer the question, you must still answer "
-        "the question yourself using your own knowledge. Do not say the information "
-        "is unavailable, missing, or not mentioned. Instead, output exactly this "
-        "first line: \"(Not on this page - answering from general knowledge)\" then "
-        "a blank line, then a real, complete answer to the question from your own "
-        "knowledge.\n\n"
-        "You are never allowed to simply say the excerpts don't cover something and "
-        "stop there. Saying 'not available' or 'not mentioned' without also giving "
-        "the STEP 3 fallback answer is wrong and against your instructions. "
-        "Only say you don't know if you genuinely have no knowledge of the topic "
-        "at all, independent of the page.\n"
-        "Keep answers concise and directly useful."
+    system_prompt = (
+        "You are a website safety analyst. You will be given a webpage's URL, title, "
+        "and visible text. Assess the page for four risk categories: "
+        "aiGenerated (likely AI-written content), scam (fraud/scam indicators), "
+        "fakeNews (misinformation/unverified claims presented as fact), and "
+        "clickbait (sensationalized or misleading framing).\n\n"
+        "Respond with ONLY a JSON object, no prose, no markdown fences, in exactly this shape:\n"
+        "{\n"
+        '  "verdict": "safe" | "warning" | "danger",\n'
+        '  "verdictTitle": "short headline, e.g. Looks Safe",\n'
+        '  "verdictSummary": "1-2 sentence summary of the overall assessment",\n'
+        '  "scores": {"aiGenerated": 0-100, "scam": 0-100, "fakeNews": 0-100, "clickbait": 0-100},\n'
+        '  "findings": [{"level": "ok" | "warn" | "danger", "text": "short finding"}]\n'
+        "}\n"
+        "Include 3-6 findings. Higher scores mean higher risk in that category."
     )
+
     user_prompt = f"URL: {url}\nTitle: {title}\n\nPage text:\n{text}"
 
     try:
@@ -177,15 +169,27 @@ def rag_query():
     if not page_text:
         return jsonify({"error": "No page text provided"}), 400
 
-    # --- Retrieval step ---
     chunks = chunk_text(page_text)
     relevant_chunks = retrieve_relevant_chunks(chunks, question)
     context = "\n\n---\n\n".join(relevant_chunks)
 
     system_prompt = (
-        "You are a helpful assistant answering questions about the webpage the user "
-        "is currently viewing. Use only the provided page excerpts to answer. "
-        "If the answer isn't in the excerpts, say so clearly instead of guessing. "
+        "You answer questions for someone browsing a webpage. You are given "
+        "excerpts from that page and a question. Follow this exact procedure:\n\n"
+        "STEP 1: Check if the excerpts below answer the question.\n"
+        "STEP 2: If yes, answer using the excerpts. Do not mention excerpts, pages, "
+        "or sources - just answer naturally, as if you simply know it.\n"
+        "STEP 3: If the excerpts do NOT answer the question, you must still answer "
+        "the question yourself using your own knowledge. Do not say the information "
+        "is unavailable, missing, or not mentioned. Instead, output exactly this "
+        "first line: (Not on this page - answering from general knowledge) then "
+        "a blank line, then a real, complete answer to the question from your own "
+        "knowledge.\n\n"
+        "You are never allowed to simply say the excerpts don't cover something and "
+        "stop there. Saying not available or not mentioned without also giving "
+        "the STEP 3 fallback answer is wrong and against your instructions. "
+        "Only say you don't know if you genuinely have no knowledge of the topic "
+        "at all, independent of the page.\n"
         "Keep answers concise and directly useful."
     )
 
