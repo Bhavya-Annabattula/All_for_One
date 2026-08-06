@@ -10,8 +10,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 app = Flask(__name__)
 
-# Allow requests from the Chrome extension (chrome-extension:// origin)
-# and from anywhere else while you're testing. Tighten this later if you want.
 CORS(app)
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
@@ -22,10 +20,11 @@ client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 MODEL = "llama-3.3-70b-versatile"
 
-MAX_TEXT_CHARS = 40000  # raised since we now retrieve only relevant chunks, not the whole page
-CHUNK_SIZE = 220        # target characters per chunk - small enough for precise retrieval
-CHUNK_OVERLAP = 40      # characters carried over between chunks
-TOP_K = 6               # how many chunks to send to the model per question
+MAX_TEXT_CHARS = 40000
+CHUNK_SIZE = 220
+CHUNK_OVERLAP = 40
+TOP_K = 6
+MAX_HISTORY_TURNS = 5
 
 
 def truncate(text, limit=MAX_TEXT_CHARS):
@@ -35,7 +34,6 @@ def truncate(text, limit=MAX_TEXT_CHARS):
 
 
 def extract_json(raw_text):
-    """Groq sometimes wraps JSON in prose or code fences. Pull the first {...} block out."""
     raw_text = raw_text.strip()
     raw_text = re.sub(r"^```(json)?", "", raw_text).strip()
     raw_text = re.sub(r"```$", "", raw_text).strip()
@@ -46,7 +44,6 @@ def extract_json(raw_text):
 
 
 def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
-    """Split text into overlapping chunks, breaking on sentence boundaries where possible."""
     text = text.strip()
     if not text:
         return []
@@ -81,7 +78,6 @@ def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
 
 
 def retrieve_relevant_chunks(chunks, question, top_k=TOP_K):
-    """Rank chunks by TF-IDF cosine similarity to the question, return the top_k."""
     if len(chunks) <= top_k:
         return chunks
 
@@ -163,11 +159,16 @@ def rag_query():
     page_text = truncate(data.get("page_text", ""))
     page_url = data.get("page_url", "")
     question = data.get("question", "")
+    history = data.get("history", [])
 
     if not question:
         return jsonify({"error": "No question provided"}), 400
     if not page_text:
         return jsonify({"error": "No page text provided"}), 400
+
+    if not isinstance(history, list):
+        history = []
+    history = history[-MAX_HISTORY_TURNS:]
 
     chunks = chunk_text(page_text)
     relevant_chunks = retrieve_relevant_chunks(chunks, question)
@@ -175,7 +176,10 @@ def rag_query():
 
     system_prompt = (
         "You answer questions for someone browsing a webpage. You are given "
-        "excerpts from that page and a question. Follow this exact procedure:\n\n"
+        "excerpts from that page, the recent conversation so far, and a new "
+        "question. Use the conversation history to resolve references like "
+        "'it', 'that', or 'the one you mentioned'. Follow this exact procedure "
+        "for the new question:\n\n"
         "STEP 1: Check if the excerpts below answer the question.\n"
         "STEP 2: If yes, answer using the excerpts. Do not mention excerpts, pages, "
         "or sources - just answer naturally, as if you simply know it.\n"
@@ -193,19 +197,29 @@ def rag_query():
         "Keep answers concise and directly useful."
     )
 
-    user_prompt = (
+    messages = [{"role": "system", "content": system_prompt}]
+
+    intro = (
         f"Page URL: {page_url}\n\n"
-        f"Relevant excerpts from the page:\n{context}\n\n"
-        f"Question: {question}"
+        f"Relevant excerpts from the page:\n{context}"
     )
+    messages.append({"role": "user", "content": intro})
+    messages.append({"role": "assistant", "content": "Understood, I have the page context."})
+
+    for turn in history:
+        prior_q = str(turn.get("question", "")).strip()
+        prior_a = str(turn.get("answer", "")).strip()
+        if not prior_q or not prior_a:
+            continue
+        messages.append({"role": "user", "content": prior_q})
+        messages.append({"role": "assistant", "content": prior_a})
+
+    messages.append({"role": "user", "content": question})
 
     try:
         completion = client.chat.completions.create(
             model=MODEL,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
+            messages=messages,
             temperature=0.3,
             max_tokens=600,
         )
