@@ -1,4 +1,4 @@
-const BACKEND_URL = "https://all-for-one-r4jy.onrender.com"; // update once deployed
+const BACKEND_URL = "https://all-for-one-r4jy.onrender.com";
 
 async function getActiveTabId() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -40,7 +40,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           body: JSON.stringify({
             page_text: pageData.text,
             page_url: pageData.url,
-            question: message.question
+            question: message.question,
+            history: message.history || []
           })
         });
         const data = await res.json();
@@ -49,6 +50,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: false, error: err.message });
       }
     })();
-    return true; // keep channel open for async response
+    return true;
   }
 });
