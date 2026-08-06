@@ -122,23 +122,20 @@ def security_scan():
     if not text:
         return jsonify({"error": "No page text provided"}), 400
 
-    system_prompt = (
-        "You are a website safety analyst. You will be given a webpage's URL, title, "
-        "and visible text. Assess the page for four risk categories: "
-        "aiGenerated (likely AI-written content), scam (fraud/scam indicators), "
-        "fakeNews (misinformation/unverified claims presented as fact), and "
-        "clickbait (sensationalized or misleading framing).\n\n"
-        "Respond with ONLY a JSON object, no prose, no markdown fences, in exactly this shape:\n"
-        "{\n"
-        '  "verdict": "safe" | "warning" | "danger",\n'
-        '  "verdictTitle": "short headline, e.g. Looks Safe",\n'
-        '  "verdictSummary": "1-2 sentence summary of the overall assessment",\n'
-        '  "scores": {"aiGenerated": 0-100, "scam": 0-100, "fakeNews": 0-100, "clickbait": 0-100},\n'
-        '  "findings": [{"level": "ok" | "warn" | "danger", "text": "short finding"}]\n'
-        "}\n"
-        "Include 3-6 findings. Higher scores mean higher risk in that category."
+   system_prompt = (
+        "You are a helpful assistant answering questions about the webpage the user "
+        "is currently viewing. You will be given excerpts from that page and a question.\n\n"
+        "Rules:\n"
+        "1. If the excerpts contain the answer, answer using them, and do not mention "
+        "that you used excerpts or a page - just answer naturally.\n"
+        "2. If the excerpts do NOT contain the answer, answer using your own general "
+        "knowledge instead. In that case, start your reply with exactly this line: "
+        "\"(Not on this page - answering from general knowledge)\" followed by a blank "
+        "line, then your answer.\n"
+        "3. Never say the answer is unavailable just because it is not on the page - "
+        "only say that if you genuinely do not know the answer at all, page or no page.\n"
+        "Keep answers concise and directly useful."
     )
-
     user_prompt = f"URL: {url}\nTitle: {title}\n\nPage text:\n{text}"
 
     try:
