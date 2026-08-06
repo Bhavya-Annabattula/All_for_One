@@ -5,6 +5,8 @@ import re
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from groq import Groq
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 app = Flask(__name__)
 
@@ -20,7 +22,10 @@ client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 MODEL = "llama-3.3-70b-versatile"
 
-MAX_TEXT_CHARS = 12000  # keep prompts within a safe token budget
+MAX_TEXT_CHARS = 40000  # raised since we now retrieve only relevant chunks, not the whole page
+CHUNK_SIZE = 220        # target characters per chunk - small enough for precise retrieval
+CHUNK_OVERLAP = 40      # characters carried over between chunks
+TOP_K = 6               # how many chunks to send to the model per question
 
 
 def truncate(text, limit=MAX_TEXT_CHARS):
@@ -40,6 +45,65 @@ def extract_json(raw_text):
     return json.loads(raw_text)
 
 
+def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
+    """Split text into overlapping chunks, breaking on sentence boundaries where possible."""
+    text = text.strip()
+    if not text:
+        return []
+    if len(text) <= chunk_size:
+        return [text]
+
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    chunks = []
+    current = ""
+
+    for sentence in sentences:
+        # guard against single sentences longer than chunk_size
+        if len(sentence) > chunk_size:
+            if current:
+                chunks.append(current.strip())
+                current = ""
+            for i in range(0, len(sentence), chunk_size):
+                chunks.append(sentence[i:i + chunk_size])
+            continue
+
+        if len(current) + len(sentence) + 1 <= chunk_size:
+            current += (" " if current else "") + sentence
+        else:
+            if current:
+                chunks.append(current.strip())
+            overlap_text = current[-overlap:] if len(current) > overlap else current
+            current = (overlap_text + " " + sentence).strip()
+
+    if current.strip():
+        chunks.append(current.strip())
+
+    return chunks
+
+
+def retrieve_relevant_chunks(chunks, question, top_k=TOP_K):
+    """Rank chunks by TF-IDF cosine similarity to the question, return the top_k."""
+    if len(chunks) <= top_k:
+        return chunks
+
+    try:
+        # Character n-grams (not word tokens) so plurals and word-form
+        # variations like "restaurant" vs "restaurants" still match well,
+        # without needing a separate stemming library.
+        vectorizer = TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 5))
+        chunk_vectors = vectorizer.fit_transform(chunks)
+        question_vector = vectorizer.transform([question])
+        sims = cosine_similarity(question_vector, chunk_vectors)[0]
+
+        ranked_indices = sims.argsort()[::-1][:top_k]
+        # keep original page order among the selected chunks for readability
+        ranked_indices = sorted(ranked_indices)
+        return [chunks[i] for i in ranked_indices]
+    except ValueError:
+        # can happen if the question/chunks produce an empty vocabulary after stop-word removal
+        return chunks[:top_k]
+
+
 @app.route("/", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "service": "extension-backend"})
@@ -53,7 +117,7 @@ def security_scan():
     data = request.get_json(force=True, silent=True) or {}
     url = data.get("url", "")
     title = data.get("title", "")
-    text = truncate(data.get("text", ""))
+    text = truncate(data.get("text", ""), limit=12000)
 
     if not text:
         return jsonify({"error": "No page text provided"}), 400
@@ -111,16 +175,21 @@ def rag_query():
     if not page_text:
         return jsonify({"error": "No page text provided"}), 400
 
+    # --- Retrieval step ---
+    chunks = chunk_text(page_text)
+    relevant_chunks = retrieve_relevant_chunks(chunks, question)
+    context = "\n\n---\n\n".join(relevant_chunks)
+
     system_prompt = (
         "You are a helpful assistant answering questions about the webpage the user "
-        "is currently viewing. Use only the provided page content to answer. "
-        "If the answer isn't in the page content, say so clearly instead of guessing. "
+        "is currently viewing. Use only the provided page excerpts to answer. "
+        "If the answer isn't in the excerpts, say so clearly instead of guessing. "
         "Keep answers concise and directly useful."
     )
 
     user_prompt = (
         f"Page URL: {page_url}\n\n"
-        f"Page content:\n{page_text}\n\n"
+        f"Relevant excerpts from the page:\n{context}\n\n"
         f"Question: {question}"
     )
 
@@ -135,7 +204,11 @@ def rag_query():
             max_tokens=600,
         )
         answer = completion.choices[0].message.content.strip()
-        return jsonify({"answer": answer})
+        return jsonify({
+            "answer": answer,
+            "chunks_used": len(relevant_chunks),
+            "total_chunks": len(chunks),
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
