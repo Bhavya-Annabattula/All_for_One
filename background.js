@@ -1,17 +1,31 @@
+import { extractTextFromPdfUrl, isPdfUrl } from "./pdf-extract.js";
+
 const BACKEND_URL = "https://all-for-one-r4jy.onrender.com";
 
-async function getActiveTabId() {
+async function getActiveTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab) {
     throw new Error("No active tab found");
   }
-  return tab.id;
+  return tab;
 }
 
 async function getPageContentFromActiveTab() {
-  const tabId = await getActiveTabId();
+  const tab = await getActiveTab();
+
+  if (isPdfUrl(tab.url)) {
+    const { text, numPages } = await extractTextFromPdfUrl(tab.url);
+    return {
+      title: tab.title || tab.url.split("/").pop(),
+      url: tab.url,
+      text: text || "(This PDF appears to have no extractable text — it may be a scanned image.)",
+      isPdf: true,
+      numPages
+    };
+  }
+
   return new Promise((resolve, reject) => {
-    chrome.tabs.sendMessage(tabId, { type: "GET_PAGE_CONTENT" }, (response) => {
+    chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE_CONTENT" }, (response) => {
       if (chrome.runtime.lastError) {
         reject(new Error(chrome.runtime.lastError.message));
         return;
@@ -40,12 +54,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           body: JSON.stringify({
             page_text: pageData.text,
             page_url: pageData.url,
-            question: message.question,
-            history: message.history || []
+            question: message.question
           })
         });
         const data = await res.json();
-        sendResponse({ success: true, answer: data.answer });
+        sendResponse({ success: true, answer: data.answer, isPdf: pageData.isPdf || false });
       } catch (err) {
         sendResponse({ success: false, error: err.message });
       }
