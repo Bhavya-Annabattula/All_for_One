@@ -3,10 +3,11 @@
   "name": "All for One",
   "version": "1.0.0",
   "description": "All-in-one browser assistant: security check, tech detector, page-aware AI chat",
-  "permissions": ["storage", "activeTab", "scripting", "sidePanel"],
+  "permissions": ["storage", "activeTab", "scripting", "sidePanel", "offscreen"],
   "host_permissions": ["<all_urls>"],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [
     {
@@ -19,5 +20,11 @@
   },
   "side_panel": {
     "default_path": "sidepanel.html"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["pdf.worker.mjs"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }
