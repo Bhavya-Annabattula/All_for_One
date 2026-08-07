@@ -21,18 +21,18 @@ function addMessage(text, sender, opts = {}) {
   return msg;
 }
 
-function addThinkingBubble() {
+function addThinkingBubble(label = "Thinking") {
   clearEmptyState();
   const chatLog = document.getElementById("chatLog");
   const msg = document.createElement("div");
   msg.className = "msg bot thinking";
-  msg.innerHTML = 'Thinking <span class="dot-pulse"><span></span><span></span><span></span></span>';
+  msg.innerHTML = `${label} <span class="dot-pulse"><span></span><span></span><span></span></span>`;
   chatLog.appendChild(msg);
   chatLog.scrollTop = chatLog.scrollHeight;
   return msg;
 }
 
-function sendQuestion(question) {
+async function sendQuestion(question) {
   if (!question) return;
 
   addMessage(question, "user");
@@ -40,7 +40,15 @@ function sendQuestion(question) {
   const askBtn = document.getElementById("askBtn");
   askBtn.disabled = true;
 
-  const thinkingMsg = addThinkingBubble();
+  let isPdf = false;
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    isPdf = !!tab?.url?.split("?")[0].split("#")[0].toLowerCase().endsWith(".pdf");
+  } catch (err) {
+    // ignore — fall back to default label
+  }
+
+  const thinkingMsg = addThinkingBubble(isPdf ? "Reading PDF" : "Thinking");
 
   chrome.runtime.sendMessage(
     {
