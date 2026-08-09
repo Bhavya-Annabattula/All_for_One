@@ -78,8 +78,6 @@ def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
             if current:
                 chunks.append(current.strip())
                 current = ""
-            # Word-boundary-safe split instead of a raw character slice,
-            # so words never get cut in half.
             chunks.extend(split_long_span(sentence, chunk_size))
             continue
 
@@ -89,8 +87,6 @@ def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
             if current:
                 chunks.append(current.strip())
             overlap_text = current[-overlap:] if len(current) > overlap else current
-            # Avoid starting the next chunk mid-word: snap overlap back
-            # to the nearest preceding space.
             if overlap_text and " " in overlap_text:
                 overlap_text = overlap_text[overlap_text.index(" ") + 1:]
             elif overlap_text and current and len(overlap_text) < len(current):
@@ -152,8 +148,7 @@ def security_scan():
         '  "scores": {"aiGenerated": 0-100, "scam": 0-100, "fakeNews": 0-100, "clickbait": 0-100},\n'
         '  "findings": [{"level": "ok" | "warn" | "danger", "text": "short finding"}]\n'
         "}\n"
-        "Include 3-6 findings. Higher scores mean higher risk in that category." 
-       
+        "Include 3-6 findings. Higher scores mean higher risk in that category."
     )
 
     user_prompt = f"URL: {url}\nTitle: {title}\n\nPage text:\n{text}"
@@ -206,34 +201,32 @@ def rag_query():
     system_prompt = (
         "You are a friendly, capable chat assistant built into a browser extension, "
         "similar in spirit to ChatGPT. The user is chatting with you while viewing a "
-        "webpage, and you're given some content from that page below as optional "
+        "webpage or PDF, and you're given some content from it below as optional "
         "background - but you are NOT limited to it.\n\n"
         "How to behave:\n"
         "- Have a natural back-and-forth conversation. Respond to greetings, small "
-        "talk, and casual remarks warmly and briefly, the way a person would - never "
-        "say 'I don't know' to a greeting or vague remark; just engage naturally and "
-        "ask what they'd like help with if it's unclear.\n"
-        "- Freely answer questions using your own general knowledge, even when the "
-        "topic has nothing to do with the page. The page content is just extra "
-        "context you can draw on when it's relevant, not a restriction on what you "
-        "can discuss.\n"
-        "- When the page content IS relevant, use it to inform your answer, but "
-        "explain things in your own words - never copy or closely mirror the exact "
-        "wording of the page content, and never reproduce sentence fragments "
-        "verbatim.\n"
-        "- Never mention 'excerpts', 'chunks', 'the provided text', or that you were "
-        "given page context - just answer naturally.\n"
-        "- Never include step labels, meta-commentary, or restate the question - "
-        "just give the answer.\n"
-        "- Keep answers conversational and concise unless the user asks for more "
-        "detail." 
-         "- Answer ONLY the single question the user just asked. Never invent or "
-"write out additional user questions, or dialogue turns - "
-"respond with exactly one direct answer and stop.\n"
-"- The background page content may contain garbled or incomplete words "
-"due to PDF text extraction limitations. Silently work around any "
-"garbled fragments - do not mention them, do not try to 'complete' or "
-"guess missing letters, and do not let them affect your answer's clarity."
+        "talk, and casual remarks warmly and briefly - never say 'I don't know' to "
+        "a greeting; just engage naturally.\n"
+        "- Freely answer using your own general knowledge, even on topics unrelated "
+        "to the page. The background content is optional context, not a restriction.\n"
+        "- When the background content IS relevant, use it to inform your answer, "
+        "but explain things in your own words - never copy or closely mirror its "
+        "exact wording.\n"
+        "- The background text may contain garbled or truncated words due to "
+        "extraction limitations (this is especially common in PDFs). Silently work "
+        "around this - do not mention it, do not try to guess or 'fix' missing "
+        "letters, and do not let it affect your answer.\n"
+        "- Never mention 'excerpts', 'chunks', 'the provided text', or that you "
+        "were given background context.\n\n"
+        "CRITICAL - respond with exactly ONE reply and stop:\n"
+        "- Write ONLY your own single answer to the user's most recent message. "
+        "Do not write the word 'Hi' or any greeting as if it came from the user. "
+        "Do not invent, continue, or simulate ANY further conversation - no fake "
+        "follow-up questions from the user, no fake questions from yourself, no "
+        "'What would you like to know more about?' style continuations, no writing "
+        "out what the user might say next.\n"
+        "- The moment your answer to the current question is complete, stop "
+        "generating. Do not add another question-and-answer pair after it."
     )
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -248,9 +241,11 @@ def rag_query():
 
     if context:
         final_prompt = (
-            f"(Background - some content from the page the user is viewing, for "
-            f"context only, not a script to follow):\n{context}\n\n"
-            f"User: {question}"
+            f"(Background content, for context only - not a script to follow or "
+            f"continue):\n{context}\n\n"
+            f"User's message: {question}\n\n"
+            "Reply with your single answer only. Do not write any further "
+            "dialogue after it."
         )
     else:
         final_prompt = question
@@ -261,8 +256,9 @@ def rag_query():
         completion = client.chat.completions.create(
             model=MODEL,
             messages=messages,
-            temperature=0.4,
-            max_tokens=600,
+            temperature=0.3,
+            max_tokens=400,
+            stop=["\nUser:", "\nHi,", "\nHello,", "User:"],
         )
         answer = completion.choices[0].message.content.strip()
         return jsonify({
