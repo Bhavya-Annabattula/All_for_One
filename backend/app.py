@@ -152,7 +152,14 @@ def security_scan():
         '  "scores": {"aiGenerated": 0-100, "scam": 0-100, "fakeNews": 0-100, "clickbait": 0-100},\n'
         '  "findings": [{"level": "ok" | "warn" | "danger", "text": "short finding"}]\n'
         "}\n"
-        "Include 3-6 findings. Higher scores mean higher risk in that category."
+        "Include 3-6 findings. Higher scores mean higher risk in that category." 
+        "- Answer ONLY the single question the user just asked. Never invent or "
+"write out additional user questions, or dialogue turns - "
+"respond with exactly one direct answer and stop.\n"
+"- The background page content may contain garbled or incomplete words "
+"due to PDF text extraction limitations. Silently work around any "
+"garbled fragments - do not mention them, do not try to 'complete' or "
+"guess missing letters, and do not let them affect your answer's clarity."
     )
 
     user_prompt = f"URL: {url}\nTitle: {title}\n\nPage text:\n{text}"
