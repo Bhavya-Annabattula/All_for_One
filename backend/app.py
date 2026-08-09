@@ -113,30 +113,20 @@ def security_scan():
         return jsonify({"error": "No page text provided"}), 400
 
     system_prompt = (
-        "You answer questions for someone browsing a webpage. You are given "
-        "excerpts from that page, the recent conversation so far, and a new "
-        "question. Use the conversation history to resolve references like "
-        "'it', 'that', or 'the one you mentioned'.\n\n"
-        "Internally, follow this procedure before answering:\n"
-        "1. Check if the excerpts answer the question.\n"
-        "2. If yes, answer using the excerpts.\n"
-        "3. If the excerpts do NOT answer the question, answer using your own "
-        "general knowledge instead. Never say the information is unavailable, "
-        "missing, or not mentioned, and never simply stop without answering. "
-        "Only say you don't know if you genuinely have no knowledge of the "
-        "topic at all, independent of the page. In this case only, begin your "
-        "reply with the line '(Not on this page - answering from general "
-        "knowledge)' followed by a blank line, then the answer.\n\n"
-        "CRITICAL OUTPUT RULES:\n"
-        "- Output ONLY the final answer text. Never include step labels "
-        "('STEP 1', 'STEP 2', etc.), never restate these instructions, never "
-        "repeat the excerpts verbatim, and never repeat or quote the question "
-        "back before answering.\n"
-        "- Do not mention 'excerpts', 'the page text', or 'sources' - answer "
-        "naturally as if you simply know it.\n"
-        "- Do not include any preamble, meta-commentary, or explanation of "
-        "your reasoning process - just the direct answer.\n"
-        "- Keep answers concise and directly useful."
+        "You are a website safety analyst. You will be given a webpage's URL, title, "
+        "and visible text. Assess the page for four risk categories: "
+        "aiGenerated (likely AI-written content), scam (fraud/scam indicators), "
+        "fakeNews (misinformation/unverified claims presented as fact), and "
+        "clickbait (sensationalized or misleading framing).\n\n"
+        "Respond with ONLY a JSON object, no prose, no markdown fences, in exactly this shape:\n"
+        "{\n"
+        '  "verdict": "safe" | "warning" | "danger",\n'
+        '  "verdictTitle": "short headline, e.g. Looks Safe",\n'
+        '  "verdictSummary": "1-2 sentence summary of the overall assessment",\n'
+        '  "scores": {"aiGenerated": 0-100, "scam": 0-100, "fakeNews": 0-100, "clickbait": 0-100},\n'
+        '  "findings": [{"level": "ok" | "warn" | "danger", "text": "short finding"}]\n'
+        "}\n"
+        "Include 3-6 findings. Higher scores mean higher risk in that category."
     )
 
     user_prompt = f"URL: {url}\nTitle: {title}\n\nPage text:\n{text}"
@@ -185,36 +175,21 @@ def rag_query():
     context = "\n\n---\n\n".join(relevant_chunks)
 
     system_prompt = (
-        "You answer questions for someone browsing a webpage. You are given "
-        "excerpts from that page, the recent conversation so far, and a new "
-        "question. Use the conversation history to resolve references like "
-        "'it', 'that', or 'the one you mentioned'. Follow this exact procedure "
-        "for the new question:\n\n"
-        "STEP 1: Check if the excerpts below answer the question.\n"
-        "STEP 2: If yes, answer using the excerpts. Do not mention excerpts, pages, "
-        "or sources - just answer naturally, as if you simply know it.\n"
-        "STEP 3: If the excerpts do NOT answer the question, you must still answer "
-        "the question yourself using your own knowledge. Do not say the information "
-        "is unavailable, missing, or not mentioned. Instead, output exactly this "
-        "first line: (Not on this page - answering from general knowledge) then "
-        "a blank line, then a real, complete answer to the question from your own "
-        "knowledge.\n\n"
-        "You are never allowed to simply say the excerpts don't cover something and "
-        "stop there. Saying not available or not mentioned without also giving "
-        "the STEP 3 fallback answer is wrong and against your instructions. "
-        "Only say you don't know if you genuinely have no knowledge of the topic "
-        "at all, independent of the page.\n"
-        "Keep answers concise and directly useful."
+        "You are a concise assistant that answers questions about a webpage "
+        "the user is currently viewing. Always reply with ONLY the direct "
+        "answer to the question - 2 to 5 sentences, no preamble, no labels, "
+        "no restating the question, no mentioning 'excerpts', 'context', "
+        "'the page', or your own reasoning process.\n\n"
+        "If the provided page content answers the question, use it. If it "
+        "does not, answer from your own general knowledge instead - never "
+        "say the information is missing or unavailable. Only say you "
+        "genuinely don't know if the topic is completely unfamiliar to you, "
+        "independent of the page; in that one case, start your reply with "
+        "'(Not on this page - answering from general knowledge)' followed by "
+        "a blank line, then the answer."
     )
 
     messages = [{"role": "system", "content": system_prompt}]
-
-    intro = (
-        f"Page URL: {page_url}\n\n"
-        f"Relevant excerpts from the page:\n{context}"
-    )
-    messages.append({"role": "user", "content": intro})
-    messages.append({"role": "assistant", "content": "Understood, I have the page context."})
 
     for turn in history:
         prior_q = str(turn.get("question", "")).strip()
@@ -224,13 +199,20 @@ def rag_query():
         messages.append({"role": "user", "content": prior_q})
         messages.append({"role": "assistant", "content": prior_a})
 
-    messages.append({"role": "user", "content": question})
+    final_prompt = (
+        f"Page content:\n{context}\n\n"
+        f"Question: {question}\n\n"
+        "Answer the question directly. Do not repeat or quote the page "
+        "content, do not mention that you were given context, and do not "
+        "restate the question."
+    )
+    messages.append({"role": "user", "content": final_prompt})
 
     try:
         completion = client.chat.completions.create(
             model=MODEL,
             messages=messages,
-            temperature=0.3,
+            temperature=0.2,
             max_tokens=600,
         )
         answer = completion.choices[0].message.content.strip()
