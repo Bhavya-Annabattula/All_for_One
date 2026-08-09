@@ -113,20 +113,30 @@ def security_scan():
         return jsonify({"error": "No page text provided"}), 400
 
     system_prompt = (
-        "You are a website safety analyst. You will be given a webpage's URL, title, "
-        "and visible text. Assess the page for four risk categories: "
-        "aiGenerated (likely AI-written content), scam (fraud/scam indicators), "
-        "fakeNews (misinformation/unverified claims presented as fact), and "
-        "clickbait (sensationalized or misleading framing).\n\n"
-        "Respond with ONLY a JSON object, no prose, no markdown fences, in exactly this shape:\n"
-        "{\n"
-        '  "verdict": "safe" | "warning" | "danger",\n'
-        '  "verdictTitle": "short headline, e.g. Looks Safe",\n'
-        '  "verdictSummary": "1-2 sentence summary of the overall assessment",\n'
-        '  "scores": {"aiGenerated": 0-100, "scam": 0-100, "fakeNews": 0-100, "clickbait": 0-100},\n'
-        '  "findings": [{"level": "ok" | "warn" | "danger", "text": "short finding"}]\n'
-        "}\n"
-        "Include 3-6 findings. Higher scores mean higher risk in that category."
+        "You answer questions for someone browsing a webpage. You are given "
+        "excerpts from that page, the recent conversation so far, and a new "
+        "question. Use the conversation history to resolve references like "
+        "'it', 'that', or 'the one you mentioned'.\n\n"
+        "Internally, follow this procedure before answering:\n"
+        "1. Check if the excerpts answer the question.\n"
+        "2. If yes, answer using the excerpts.\n"
+        "3. If the excerpts do NOT answer the question, answer using your own "
+        "general knowledge instead. Never say the information is unavailable, "
+        "missing, or not mentioned, and never simply stop without answering. "
+        "Only say you don't know if you genuinely have no knowledge of the "
+        "topic at all, independent of the page. In this case only, begin your "
+        "reply with the line '(Not on this page - answering from general "
+        "knowledge)' followed by a blank line, then the answer.\n\n"
+        "CRITICAL OUTPUT RULES:\n"
+        "- Output ONLY the final answer text. Never include step labels "
+        "('STEP 1', 'STEP 2', etc.), never restate these instructions, never "
+        "repeat the excerpts verbatim, and never repeat or quote the question "
+        "back before answering.\n"
+        "- Do not mention 'excerpts', 'the page text', or 'sources' - answer "
+        "naturally as if you simply know it.\n"
+        "- Do not include any preamble, meta-commentary, or explanation of "
+        "your reasoning process - just the direct answer.\n"
+        "- Keep answers concise and directly useful."
     )
 
     user_prompt = f"URL: {url}\nTitle: {title}\n\nPage text:\n{text}"
