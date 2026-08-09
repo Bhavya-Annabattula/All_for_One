@@ -153,13 +153,7 @@ def security_scan():
         '  "findings": [{"level": "ok" | "warn" | "danger", "text": "short finding"}]\n'
         "}\n"
         "Include 3-6 findings. Higher scores mean higher risk in that category." 
-        "- Answer ONLY the single question the user just asked. Never invent or "
-"write out additional user questions, or dialogue turns - "
-"respond with exactly one direct answer and stop.\n"
-"- The background page content may contain garbled or incomplete words "
-"due to PDF text extraction limitations. Silently work around any "
-"garbled fragments - do not mention them, do not try to 'complete' or "
-"guess missing letters, and do not let them affect your answer's clarity."
+       
     )
 
     user_prompt = f"URL: {url}\nTitle: {title}\n\nPage text:\n{text}"
@@ -232,7 +226,14 @@ def rag_query():
         "- Never include step labels, meta-commentary, or restate the question - "
         "just give the answer.\n"
         "- Keep answers conversational and concise unless the user asks for more "
-        "detail."
+        "detail." 
+         "- Answer ONLY the single question the user just asked. Never invent or "
+"write out additional user questions, or dialogue turns - "
+"respond with exactly one direct answer and stop.\n"
+"- The background page content may contain garbled or incomplete words "
+"due to PDF text extraction limitations. Silently work around any "
+"garbled fragments - do not mention them, do not try to 'complete' or "
+"guess missing letters, and do not let them affect your answer's clarity."
     )
 
     messages = [{"role": "system", "content": system_prompt}]
