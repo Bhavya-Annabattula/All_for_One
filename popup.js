@@ -59,14 +59,14 @@ document.getElementById("xrayBtn").addEventListener("click", async () => {
 
   btn.disabled = true;
   btn.textContent = "Scanning...";
-  resultDiv.innerHTML = `<div class="scan-loading"><span class="dot-pulse"></span> Scanning page for technologies...</div>`;
+  resultDiv.innerHTML = `<div class="scan-loading"><span class="dot-pulse"><span></span><span></span><span></span></span> Scanning page for technologies...</div>`;
 
   try {
     const tab = await getActiveTab();
 
     const [injectionResult] = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      func: detectTechStack,
+      func: window.detectTechStack,
       world: "MAIN"
     });
 
@@ -76,7 +76,7 @@ document.getElementById("xrayBtn").addEventListener("click", async () => {
 
     renderXrayResult(data);
   } catch (err) {
-    resultDiv.innerHTML = `<div style="color:#f87171;">Error: ${escHtml(err.message)}</div>`;
+    resultDiv.innerHTML = `<div style="color:#dc2626;">Error: ${escHtml(err.message)}</div>`;
   }
 
   btn.disabled = false;
@@ -140,9 +140,9 @@ function renderXrayResult(data) {
 
   resultDiv.innerHTML = summaryHtml + categoriesHtml;
 }
+
 // --- Security ---
-// --- Security ---
-const BACKEND_URL = "https://all-for-one-r4jy.onrender.com";// same URL as your RAG backend
+const BACKEND_URL = "https://all-for-one-r4jy.onrender.com";
 
 document.getElementById("securityBtn").addEventListener("click", async () => {
   const resultDiv = document.getElementById("securityResult");
@@ -150,7 +150,7 @@ document.getElementById("securityBtn").addEventListener("click", async () => {
 
   btn.disabled = true;
   btn.textContent = "Scanning...";
- resultDiv.innerHTML = `<div class="scan-loading"><span class="dot-pulse"></span> Analyzing page content...</div>`;
+  resultDiv.innerHTML = `<div class="scan-loading"><span class="dot-pulse"><span></span><span></span><span></span></span> Analyzing page content...</div>`;
 
   try {
     const tab = await getActiveTab();
@@ -180,7 +180,7 @@ document.getElementById("securityBtn").addEventListener("click", async () => {
 
     renderSecurityResult(data);
   } catch (err) {
-    resultDiv.innerHTML = `<div style="color:#f87171;">Error: ${escHtml(err.message)}</div>`;
+    resultDiv.innerHTML = `<div style="color:#dc2626;">Error: ${escHtml(err.message)}</div>`;
   }
 
   btn.disabled = false;
@@ -190,19 +190,32 @@ document.getElementById("securityBtn").addEventListener("click", async () => {
 function renderSecurityResult(d) {
   const resultDiv = document.getElementById("securityResult");
   const verdictColor = d.verdict === "safe" ? "#22c55e" : d.verdict === "warning" ? "#eab308" : "#ef4444";
-  const verdictIcon = d.verdict === "safe" ? "✓" : d.verdict === "warning" ? "!" : "✕";
   const labels = { aiGenerated: "AI-Generated Content", scam: "Scam / Fraud", fakeNews: "Fake / Misinformation", clickbait: "Clickbait" };
+
+  const scores = d.scores || {};
+  const riskValues = Object.values(scores);
+  const avgRisk = riskValues.length ? riskValues.reduce((a, b) => a + b, 0) / riskValues.length : 0;
+  const safetyPct = Math.max(0, Math.min(100, Math.round(100 - avgRisk)));
+
+  const ringHtml = `
+    <div class="sec-ring-wrap" style="background: conic-gradient(${verdictColor} ${safetyPct * 3.6}deg, #e8e6df 0deg); --ring-color: ${verdictColor};">
+      <div class="sec-ring-inner">
+        <div class="sec-ring-pct">${safetyPct}%</div>
+        <div class="sec-ring-label">Safe</div>
+      </div>
+    </div>`;
 
   const bannerHtml = `
     <div class="sec-verdict-banner" style="--verdict-color: ${verdictColor};">
-      <div class="sec-verdict-icon" style="color:${verdictColor};">${verdictIcon}</div>
+      ${ringHtml}
       <div class="sec-verdict-text">
         <strong>${escHtml(d.verdictTitle || "")}</strong>
         <p>${escHtml(d.verdictSummary || "")}</p>
       </div>
     </div>`;
 
-  const scoresHtml = Object.entries(d.scores || {}).map(([key, val]) => {
+  const scoreEntries = Object.entries(scores);
+  const scoresHtml = scoreEntries.map(([key, val]) => {
     const [start, end] = val < 35
       ? ["#16a34a", "#22c55e"]
       : val < 65
@@ -214,7 +227,7 @@ function renderSecurityResult(d) {
           <span>${labels[key] || key}</span><span>${val}%</span>
         </div>
         <div class="sec-score-track">
-          <div class="sec-score-fill" style="width:${val}%; --fill-start:${start}; --fill-end:${end};"></div>
+          <div class="sec-score-fill" data-target="${val}" style="--fill-start:${start}; --fill-end:${end};"></div>
         </div>
       </div>`;
   }).join("");
@@ -233,6 +246,14 @@ function renderSecurityResult(d) {
     <div>${scoresHtml}</div>
     <div class="sec-findings">${findingsHtml}</div>
   `;
+
+  // Animate bars from 0 to their target width on the next frame,
+  // so the fill transition actually plays instead of snapping instantly.
+  requestAnimationFrame(() => {
+    resultDiv.querySelectorAll(".sec-score-fill").forEach(el => {
+      el.style.width = el.dataset.target + "%";
+    });
+  });
 }
 
 function escHtml(s) {
@@ -256,4 +277,33 @@ avatarToggle.addEventListener("change", async () => {
   } catch (err) {
     // no active tab or content script not present - ignore
   }
+});
+
+// --- Character picker ---
+const characterOptions = document.querySelectorAll(".character-option");
+
+function setSelectedCharacterUI(character) {
+  characterOptions.forEach(opt => {
+    opt.classList.toggle("selected", opt.dataset.character === character);
+  });
+}
+
+chrome.storage.local.get(["avatarCharacter"], (result) => {
+  const current = result.avatarCharacter || "cat";
+  setSelectedCharacterUI(current);
+});
+
+characterOptions.forEach(opt => {
+  opt.addEventListener("click", async () => {
+    const character = opt.dataset.character;
+    setSelectedCharacterUI(character);
+    chrome.storage.local.set({ avatarCharacter: character });
+
+    try {
+      const tab = await getActiveTab();
+      chrome.tabs.sendMessage(tab.id, { type: "SET_AVATAR_CHARACTER", character });
+    } catch (err) {
+      // no active tab or content script not present - ignore
+    }
+  });
 });
