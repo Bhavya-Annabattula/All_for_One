@@ -23,8 +23,14 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["pdf.worker.mjs"],
-      "matches": ["<all_urls>"]
+        "resources": [
+            "pdf.worker.mjs",
+            "fox-character.png",
+            "cat-character.png",
+            "penguin-character.png"
+        ],
+        "matches": ["<all_urls>"]
     }
-  ]
+
+]
 }
