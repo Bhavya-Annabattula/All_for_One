@@ -21,10 +21,10 @@ client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 MODEL = "llama-3.3-70b-versatile"
 
 MAX_TEXT_CHARS = 40000
-CHUNK_SIZE = 220
-CHUNK_OVERLAP = 40
+CHUNK_SIZE = 700
+CHUNK_OVERLAP = 80
 TOP_K = 6
-MAX_HISTORY_TURNS = 5
+MAX_HISTORY_TURNS = 8
 
 
 def truncate(text, limit=MAX_TEXT_CHARS):
@@ -43,6 +43,25 @@ def extract_json(raw_text):
     return json.loads(raw_text)
 
 
+def split_long_span(span, chunk_size):
+    """Split an overly long span of text on WORD boundaries only,
+    so a chunk never starts or ends mid-word."""
+    words = span.split(" ")
+    pieces = []
+    current = ""
+    for w in words:
+        if not current:
+            current = w
+        elif len(current) + 1 + len(w) <= chunk_size:
+            current += " " + w
+        else:
+            pieces.append(current)
+            current = w
+    if current:
+        pieces.append(current)
+    return pieces
+
+
 def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
     text = text.strip()
     if not text:
@@ -59,8 +78,9 @@ def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
             if current:
                 chunks.append(current.strip())
                 current = ""
-            for i in range(0, len(sentence), chunk_size):
-                chunks.append(sentence[i:i + chunk_size])
+            # Word-boundary-safe split instead of a raw character slice,
+            # so words never get cut in half.
+            chunks.extend(split_long_span(sentence, chunk_size))
             continue
 
         if len(current) + len(sentence) + 1 <= chunk_size:
@@ -69,6 +89,12 @@ def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
             if current:
                 chunks.append(current.strip())
             overlap_text = current[-overlap:] if len(current) > overlap else current
+            # Avoid starting the next chunk mid-word: snap overlap back
+            # to the nearest preceding space.
+            if overlap_text and " " in overlap_text:
+                overlap_text = overlap_text[overlap_text.index(" ") + 1:]
+            elif overlap_text and current and len(overlap_text) < len(current):
+                overlap_text = ""
             current = (overlap_text + " " + sentence).strip()
 
     if current.strip():
@@ -163,30 +189,43 @@ def rag_query():
 
     if not question:
         return jsonify({"error": "No question provided"}), 400
-    if not page_text:
-        return jsonify({"error": "No page text provided"}), 400
 
     if not isinstance(history, list):
         history = []
     history = history[-MAX_HISTORY_TURNS:]
 
-    chunks = chunk_text(page_text)
-    relevant_chunks = retrieve_relevant_chunks(chunks, question)
-    context = "\n\n---\n\n".join(relevant_chunks)
+    context = ""
+    chunks = []
+    relevant_chunks = []
+    if page_text:
+        chunks = chunk_text(page_text)
+        relevant_chunks = retrieve_relevant_chunks(chunks, question)
+        context = "\n\n---\n\n".join(relevant_chunks)
 
     system_prompt = (
-        "You are a concise assistant that answers questions about a webpage "
-        "the user is currently viewing. Always reply with ONLY the direct "
-        "answer to the question - 2 to 5 sentences, no preamble, no labels, "
-        "no restating the question, no mentioning 'excerpts', 'context', "
-        "'the page', or your own reasoning process.\n\n"
-        "If the provided page content answers the question, use it. If it "
-        "does not, answer from your own general knowledge instead - never "
-        "say the information is missing or unavailable. Only say you "
-        "genuinely don't know if the topic is completely unfamiliar to you, "
-        "independent of the page; in that one case, start your reply with "
-        "'(Not on this page - answering from general knowledge)' followed by "
-        "a blank line, then the answer."
+        "You are a friendly, capable chat assistant built into a browser extension, "
+        "similar in spirit to ChatGPT. The user is chatting with you while viewing a "
+        "webpage, and you're given some content from that page below as optional "
+        "background - but you are NOT limited to it.\n\n"
+        "How to behave:\n"
+        "- Have a natural back-and-forth conversation. Respond to greetings, small "
+        "talk, and casual remarks warmly and briefly, the way a person would - never "
+        "say 'I don't know' to a greeting or vague remark; just engage naturally and "
+        "ask what they'd like help with if it's unclear.\n"
+        "- Freely answer questions using your own general knowledge, even when the "
+        "topic has nothing to do with the page. The page content is just extra "
+        "context you can draw on when it's relevant, not a restriction on what you "
+        "can discuss.\n"
+        "- When the page content IS relevant, use it to inform your answer, but "
+        "explain things in your own words - never copy or closely mirror the exact "
+        "wording of the page content, and never reproduce sentence fragments "
+        "verbatim.\n"
+        "- Never mention 'excerpts', 'chunks', 'the provided text', or that you were "
+        "given page context - just answer naturally.\n"
+        "- Never include step labels, meta-commentary, or restate the question - "
+        "just give the answer.\n"
+        "- Keep answers conversational and concise unless the user asks for more "
+        "detail."
     )
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -199,20 +238,22 @@ def rag_query():
         messages.append({"role": "user", "content": prior_q})
         messages.append({"role": "assistant", "content": prior_a})
 
-    final_prompt = (
-        f"Page content:\n{context}\n\n"
-        f"Question: {question}\n\n"
-        "Answer the question directly. Do not repeat or quote the page "
-        "content, do not mention that you were given context, and do not "
-        "restate the question."
-    )
+    if context:
+        final_prompt = (
+            f"(Background - some content from the page the user is viewing, for "
+            f"context only, not a script to follow):\n{context}\n\n"
+            f"User: {question}"
+        )
+    else:
+        final_prompt = question
+
     messages.append({"role": "user", "content": final_prompt})
 
     try:
         completion = client.chat.completions.create(
             model=MODEL,
             messages=messages,
-            temperature=0.2,
+            temperature=0.4,
             max_tokens=600,
         )
         answer = completion.choices[0].message.content.strip()
