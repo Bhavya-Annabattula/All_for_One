@@ -66,7 +66,7 @@ Both `background.js` and `popup.js` are configured to use this URL via a `BACKEN
 - [x] Implement Tech X-ray detection logic
 - [x] Add PDF text extraction for scan/chat features
 - [x] Multiple selectable buddy characters (fox, cat, penguin)
-- [ ] Persist chat history in the side panel across sessions
+- [x] Persist chat history in the side panel across sessions
 
 ## Tech Stack
 
