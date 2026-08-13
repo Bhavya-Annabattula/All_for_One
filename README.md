@@ -77,11 +77,12 @@ Both `background.js` and `popup.js` are configured to use this URL via a `BACKEN
 ## Installation (From Downloaded ZIP)
 
 1. **Download and extract** the `all-for-one.zip` file to a folder on your computer.
-2. Open Google Chrome and go to `chrome://extensions` in the address bar.
-3. Enable **Developer mode** using the toggle in the top-right corner.
-4. Click **Load unpacked**.
-5. Select the extracted `all-for-one` folder (the one containing `manifest.json`).
-6. The extension icon will appear in your Chrome toolbar. Pin it for easy access (click the puzzle-piece icon → pin "All for One").
+2. Or download from this link : https://github.com/Bhavya-Annabattula/All_for_One/releases/download/v1.0.0/all-for-one.zip 
+3. Open Google Chrome and go to `chrome://extensions` in the address bar.
+4. Enable **Developer mode** using the toggle in the top-right corner.
+5. Click **Load unpacked**.
+6. Select the extracted `all-for-one` folder (the one containing `manifest.json`).
+7. The extension icon will appear in your Chrome toolbar. Pin it for easy access (click the puzzle-piece icon → pin "All for One").
 
 The extension is now ready to use — no backend setup is required to try the Tech X-ray, Security Scan, or AI Chatbot features, since they connect to the already-deployed backend at `https://all-for-one-r4jy.onrender.com`.
 
