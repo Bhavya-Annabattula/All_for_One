@@ -73,3 +73,36 @@ Both `background.js` and `popup.js` are configured to use this URL via a `BACKEN
 - **Frontend:** Chrome Extension (Manifest V3), vanilla JS, pdf.js
 - **Backend:** Flask, Groq (LLaMA3-70B), `flask-cors`
 - **Deployment:** Render
+
+## Installation (From Downloaded ZIP)
+
+1. **Download and extract** the `all-for-one.zip` file to a folder on your computer.
+2. Open Google Chrome and go to `chrome://extensions` in the address bar.
+3. Enable **Developer mode** using the toggle in the top-right corner.
+4. Click **Load unpacked**.
+5. Select the extracted `all-for-one` folder (the one containing `manifest.json`).
+6. The extension icon will appear in your Chrome toolbar. Pin it for easy access (click the puzzle-piece icon → pin "All for One").
+
+The extension is now ready to use — no backend setup is required to try the Tech X-ray, Security Scan, or AI Chatbot features, since they connect to the already-deployed backend at `https://all-for-one-r4jy.onrender.com`.
+
+> ⚠️ **Note:** The backend runs on Render's free tier and spins down after ~15 minutes of inactivity. The first request after idle time may take 20–50 seconds while it cold-starts. If a scan or chat reply seems stuck, wait a few seconds and try again.
+
+## Running Your Own Backend (Optional)
+
+If you'd rather run the backend yourself instead of using the hosted one:
+
+1. Navigate to the `backend/` folder.
+2. Create a virtual environment and install dependencies:
+   \`\`\`
+   pip install -r requirements.txt
+   \`\`\`
+3. Copy `.env.example` to `.env` and add your own Groq API key:
+   \`\`\`
+   GROQ_API_KEY=your_key_here
+   \`\`\`
+4. Run the server locally:
+   \`\`\`
+   python app.py
+   \`\`\`
+5. Update the `BACKEND_URL` constant in both `popup.js` and `background.js` to point to your local server (e.g., `http://localhost:5000`).
+  
